@@ -28,7 +28,10 @@ if (process.env.CLOUDINARY_CLOUD_NAME) {
 }
 
 /* ── Upload ── */
-const uploadsDir = path.join(__dirname, 'uploads');
+// On Glitch, keep uploads inside .data so they persist
+const uploadsDir = process.env.DATA_DIR
+  ? path.join(path.resolve(__dirname, process.env.DATA_DIR), 'uploads')
+  : path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const storage = multer.diskStorage({

@@ -2,7 +2,10 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const dataDir = path.join(__dirname, 'data');
+// On Glitch set DATA_DIR=.data (their persistent folder); elsewhere defaults to ./data
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(__dirname, process.env.DATA_DIR)
+  : path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(path.join(dataDir, 'compliance.db'));

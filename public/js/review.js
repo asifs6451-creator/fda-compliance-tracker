@@ -1,39 +1,45 @@
 let allImages = [];
-let filtered = [];
+let filtered  = [];
 
 async function init() {
-  const res = await fetch('/api/auth/me');
-  if (!res.ok) { location.href = '/login.html'; return; }
-  const { user } = await res.json();
-  if (!['admin','manager'].includes(user.role)) { location.href = '/'; return; }
+  const user = await checkAuth(['admin', 'manager']);
+  if (!user) return;
+  document.getElementById('navUser').textContent = user.full_name || user.username;
   await loadLocations();
   await loadPending();
 }
 
 async function loadLocations() {
-  const res = await fetch('/api/warehouses');
-  const wh = await res.json();
-  const sel = document.getElementById('filterLocation');
-  wh.forEach(w => sel.insertAdjacentHTML('beforeend', `<option value="${w.name}">${w.name}</option>`));
+  try {
+    const wh  = await gasCall('getWarehouses') || [];
+    const sel = document.getElementById('filterLocation');
+    wh.forEach(w => sel.insertAdjacentHTML('beforeend',
+      `<option value="${w.name}">${w.name}</option>`));
+  } catch (e) {}
 }
 
 async function loadPending() {
-  const res = await fetch('/api/review/pending');
-  allImages = await res.json();
-  const count = allImages.filter(i => i.review_status === 'pending').length;
-  document.getElementById('pendingCount').textContent = `${count} Pending`;
-  applyFilter();
+  try {
+    allImages = await gasCall('getPending') || [];
+    const count = allImages.filter(i => i.review_status === 'pending').length;
+    document.getElementById('pendingCount').textContent = `${count} Pending`;
+    applyFilter();
+  } catch (e) {
+    document.getElementById('reviewGrid').innerHTML =
+      `<div class="col-12"><div class="alert alert-danger">Failed to load: ${e.message}</div></div>`;
+  }
 }
 
 function applyFilter() {
   const loc    = document.getElementById('filterLocation').value;
   const status = document.getElementById('filterStatus').value;
   filtered = allImages.filter(img => {
-    if (loc    && img.warehouse_name !== loc)    return false;
+    if (loc    && img.warehouse_name !== loc)   return false;
     if (status && img.review_status  !== status) return false;
     return true;
   });
-  document.getElementById('resultCount').textContent = `${filtered.length} photo${filtered.length !== 1 ? 's' : ''}`;
+  document.getElementById('resultCount').textContent =
+    `${filtered.length} photo${filtered.length !== 1 ? 's' : ''}`;
   renderGrid();
 }
 
@@ -47,11 +53,11 @@ function renderGrid() {
 }
 
 function imageCard(img) {
-  const isPdf = img.filename?.endsWith('.pdf');
+  const isPdf = (img.original_name || '').toLowerCase().endsWith('.pdf');
   const statusBadge = {
     pending:  '<span class="badge bg-warning text-dark">⏳ Pending</span>',
     approved: '<span class="badge bg-success">✅ Approved</span>',
-    rejected: '<span class="badge bg-danger">❌ Rejected</span>',
+    rejected: '<span class="badge bg-danger">❌ Rejected</span>'
   }[img.review_status] || '';
 
   const thumb = isPdf
@@ -82,7 +88,7 @@ function imageCard(img) {
           ${statusBadge}
         </div>
         <div class="text-muted" style="font-size:.75rem">${img.item_title}</div>
-        <div class="text-muted" style="font-size:.72rem">${img.compliance_date} · ${img.uploaded_by||'?'}</div>
+        <div class="text-muted" style="font-size:.72rem">${img.compliance_date} · ${img.uploaded_by || '?'}</div>
         ${img.reviewed_by ? `<div class="text-muted" style="font-size:.7rem">Reviewed by: ${img.reviewed_by}</div>` : ''}
         ${actionBtns}
       </div>
@@ -91,17 +97,13 @@ function imageCard(img) {
 }
 
 async function approveImg(id) {
-  const res = await fetch(`/api/review/${id}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'approved' })
-  });
-  if (res.ok) {
+  try {
+    await gasCall('reviewImage', { uploadId: id, action: 'approved' });
     const img = allImages.find(i => i.id === id);
     if (img) img.review_status = 'approved';
     applyFilter();
     showToast('Image approved ✓', 'success');
-  }
+  } catch (e) { showToast(e.message, 'danger'); }
 }
 
 function openReject(id) {
@@ -113,26 +115,21 @@ function openReject(id) {
 async function submitReject() {
   const id    = document.getElementById('rejectUploadId').value;
   const notes = document.getElementById('rejectNotes').value.trim();
-  const res = await fetch(`/api/review/${id}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'rejected', notes })
-  });
-  bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
-  if (res.ok) {
+  try {
+    await gasCall('reviewImage', { uploadId: +id, action: 'rejected', notes });
+    bootstrap.Modal.getInstance(document.getElementById('rejectModal')).hide();
     const img = allImages.find(i => i.id == id);
     if (img) { img.review_status = 'rejected'; img.review_notes = notes; }
     applyFilter();
     showToast('Image rejected', 'success');
-  }
+  } catch (e) { showToast(e.message, 'danger'); }
 }
 
-async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  location.href = '/login.html';
-}
+function logout() { doLogout(); }
+
 function showToast(msg, type) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.className = `toast align-items-center text-white border-0 bg-${type === 'success' ? 'success' : 'danger'}`;
   document.getElementById('toastMsg').textContent = msg;
   bootstrap.Toast.getOrCreateInstance(t, { delay: 2500 }).show();

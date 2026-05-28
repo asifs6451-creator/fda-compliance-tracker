@@ -58,7 +58,16 @@
       </div>
     </div>
   </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
   <script>
+    // If already logged in, redirect
+    if (localStorage.getItem('fda_token') && localStorage.getItem('fda_user')) {
+      const u = JSON.parse(localStorage.getItem('fda_user'));
+      location.href = (u.role === 'pharmacist' && u.warehouse_id)
+        ? `checklist.html?id=${u.warehouse_id}` : 'index.html';
+    }
+
     document.getElementById('togglePwd').addEventListener('click', () => {
       const inp = document.getElementById('password');
       const ico = document.querySelector('#togglePwd i');
@@ -76,23 +85,15 @@
       btn.disabled = true; spinner.classList.remove('d-none'); icon.classList.add('d-none');
 
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: document.getElementById('username').value.trim(),
-            password: document.getElementById('password').value,
-          })
+        const data = await gasCall('login', {
+          username: document.getElementById('username').value.trim(),
+          password: document.getElementById('password').value
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Login failed');
-        // Redirect based on role
+        if (!data || !data.token) throw new Error('Login failed');
+        setAuth(data.token, data.user);
         const u = data.user;
-        if (u.role === 'pharmacist' && u.warehouse_id) {
-          location.href = `/checklist.html?id=${u.warehouse_id}`;
-        } else {
-          location.href = '/';
-        }
+        location.href = (u.role === 'pharmacist' && u.warehouse_id)
+          ? `checklist.html?id=${u.warehouse_id}` : 'index.html';
       } catch (e) {
         err.textContent = e.message;
         err.classList.remove('d-none');

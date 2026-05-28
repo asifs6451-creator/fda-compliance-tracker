@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FDA Compliance Tracker — Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-body-secondary">
+
+<nav class="navbar navbar-dark sticky-top shadow" style="background:var(--navy)">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand fw-bold d-flex align-items-center gap-2 mb-0">
+      <i class="fas fa-shield-halved"></i>FDA Compliance Tracker
+      <span class="badge bg-white text-dark fw-normal ms-1" style="font-size:.68rem">Daily Monitor</span>
+    </span>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/review.html" class="btn btn-sm btn-outline-warning position-relative d-none" id="reviewBtn" title="Image Review">
+        <i class="fas fa-images"></i>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="reviewBadge" style="font-size:.6rem"></span>
+      </a>
+      <a href="/admin.html" class="btn btn-sm btn-outline-light d-none" id="adminBtn" title="Admin Panel">
+        <i class="fas fa-cog"></i>
+      </a>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="fas fa-user-circle me-1"></i><span id="navUsername">…</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text small text-muted" id="navRole"></span></li>
+          <li><hr class="dropdown-divider my-1"></li>
+          <li><button class="dropdown-item text-danger" onclick="logout()">
+            <i class="fas fa-sign-out-alt me-2"></i>Sign Out</button></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Date bar -->
+<div class="bg-white border-bottom shadow-sm">
+  <div class="container-fluid px-4 py-2 d-flex align-items-center gap-2 flex-wrap">
+    <i class="fas fa-calendar-day text-primary"></i>
+    <span class="fw-semibold" id="dateLabel"></span>
+    <div class="d-flex gap-1 ms-2">
+      <button class="btn btn-sm btn-outline-secondary" id="btnPrev" onclick="shiftDate(-1)"><i class="fas fa-chevron-left"></i></button>
+      <button class="btn btn-sm btn-primary" id="btnToday" onclick="goToday()">Today</button>
+      <button class="btn btn-sm btn-outline-secondary" id="btnNext" onclick="shiftDate(1)"><i class="fas fa-chevron-right"></i></button>
+      <input type="date" class="form-control form-control-sm" id="datePicker" style="width:150px" onchange="setDate(this.value)">
+    </div>
+    <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="loadDashboard()"><i class="fas fa-rotate"></i></button>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="container-fluid px-4 pt-3 pb-1">
+  <div class="row g-3">
+    <div class="col-6 col-sm-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="text-muted small mb-1">Active Locations</div>
+        <div class="fw-bold fs-3 text-primary" id="s-active">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="text-muted small mb-1">Fully Compliant</div>
+        <div class="fw-bold fs-3 text-success" id="s-complete">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="text-muted small mb-1">Partial / Issues</div>
+        <div class="fw-bold fs-3 text-warning" id="s-partial">—</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-3">
+      <div class="card border-0 shadow-sm text-center py-2">
+        <div class="text-muted small mb-1">Not Started</div>
+        <div class="fw-bold fs-3 text-danger" id="s-notstarted">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="container-fluid px-4 pt-2">
+  <ul class="nav nav-tabs border-0 gap-1" id="filterTabs">
+    <li class="nav-item"><button class="nav-link active fw-semibold px-3" data-filter="all">All</button></li>
+    <li class="nav-item"><button class="nav-link fw-semibold px-3" data-filter="active">Active</button></li>
+    <li class="nav-item"><button class="nav-link fw-semibold px-3" data-filter="issue">Has Issues</button></li>
+  </ul>
+</div>
+
+<!-- Warehouse grid -->
+<div class="container-fluid px-4 py-3">
+  <div class="row g-3" id="warehouseGrid">
+    <div class="col-12 text-center py-5 text-muted">
+      <i class="fas fa-spinner fa-spin fa-2x d-block mb-3"></i>Loading…
+    </div>
+  </div>
+</div>
+
+<!-- Activity log -->
+<div class="container-fluid px-4 pb-5">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+      <span class="fw-semibold"><i class="fas fa-history me-2 text-muted"></i>Recent Activity</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr><th>Location</th><th>Item</th><th>Date</th><th>Status</th><th>By</th><th>Time</th></tr>
+        </thead>
+        <tbody id="activityBody"><tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>

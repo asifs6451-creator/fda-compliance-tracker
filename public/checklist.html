@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Checklist — FDA Compliance</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-body-secondary">
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark sticky-top shadow" style="background:var(--navy)">
+  <div class="container-fluid px-3">
+    <div class="d-flex align-items-center gap-3">
+      <a href="/" class="btn btn-sm btn-outline-light rounded-circle flex-shrink-0">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <div>
+        <div class="fw-bold text-white" id="whName" style="font-size:.95rem">Loading…</div>
+        <div class="text-white-50" style="font-size:.72rem" id="whMeta"></div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <div class="text-white-50 small d-none d-sm-block" id="dateDisplay"></div>
+      <span class="text-white-50 small d-none d-sm-block" id="navUser"></span>
+      <div class="progress rounded-pill d-none d-sm-flex" style="width:90px;height:8px">
+        <div class="progress-bar bg-success" id="navProgressBar" style="width:0%"></div>
+      </div>
+      <span class="text-white small fw-semibold" id="navProgressPct">0%</span>
+    </div>
+  </div>
+</nav>
+
+<!-- Identity + Date bar -->
+<div class="bg-white border-bottom">
+  <div class="container-fluid px-4 py-2 d-flex align-items-center gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-2 flex-grow-1">
+      <i class="fas fa-user-nurse text-primary fa-sm"></i>
+      <input type="text" class="form-control form-control-sm"
+        id="pharmacistName" placeholder="Your name (Pharmacist)" maxlength="80"
+        style="max-width:260px">
+    </div>
+    <!-- Date nav -->
+    <div class="d-flex align-items-center gap-1">
+      <button class="btn btn-sm btn-outline-secondary" id="cBtnPrev" onclick="shiftDate(-1)">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <button class="btn btn-sm btn-primary" id="cBtnToday" onclick="goToday()">Today</button>
+      <button class="btn btn-sm btn-outline-secondary" id="cBtnNext" onclick="shiftDate(1)">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+      <input type="date" class="form-control form-control-sm" id="cDatePicker"
+        style="width:145px" onchange="setDate(this.value)">
+    </div>
+    <span class="text-muted small ms-auto" id="lastSavedLabel"></span>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<div class="bg-white border-bottom px-4 py-2">
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <span class="small text-muted" id="progressLabel">0 / 13 items completed</span>
+    <div class="d-flex gap-3">
+      <span class="legend-dot yes">Yes</span>
+      <span class="legend-dot no">No</span>
+      <span class="legend-dot na">N/A</span>
+      <span class="legend-dot pending">Pending</span>
+    </div>
+  </div>
+  <div class="progress rounded-pill" style="height:10px">
+    <div class="progress-bar bg-success" id="progressBarYes" style="width:0%" title="Yes"></div>
+    <div class="progress-bar bg-danger" id="progressBarNo" style="width:0%" title="No"></div>
+    <div class="progress-bar bg-info" id="progressBarNa" style="width:0%" title="N/A"></div>
+  </div>
+</div>
+
+<!-- Checklist items -->
+<div class="container-fluid px-3 px-md-4 py-3" id="checklistContainer">
+  <div class="text-center py-5 text-muted">
+    <i class="fas fa-spinner fa-spin fa-2x d-block mb-3"></i>Loading checklist…
+  </div>
+</div>
+
+<!-- Sticky save button -->
+<div class="save-footer d-flex justify-content-between align-items-center px-4">
+  <div class="d-flex gap-3 small">
+    <span id="footerStats" class="text-muted"></span>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-success px-4 fw-semibold" id="saveAllBtn" onclick="saveAll()">
+      <i class="fas fa-floppy-disk me-2"></i>Save All
+    </button>
+  </div>
+</div>
+
+<!-- History panel toggle -->
+<div class="container-fluid px-4 pb-5 pt-1">
+  <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#historyPanel">
+    <i class="fas fa-clock-rotate-left me-1"></i>Show 30-day history for this location
+  </button>
+  <div class="collapse mt-2" id="historyPanel">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold py-2">Compliance History (Last 30 Days)</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Date</th><th>Items Filled</th><th>Yes</th><th>No</th><th>Compliance %</th></tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" class="text-center text-muted py-2">Click above to load history</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-semibold" id="imageModalTitle">Evidence Photos</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="imageModalBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1200">
+  <div id="toast" class="toast align-items-center text-white border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body fw-semibold" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/checklist.js"></script>
+</body>
+</html>

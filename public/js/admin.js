@@ -1,18 +1,20 @@
 let warehouses = [];
 
 async function init() {
+  const user = await checkAuth(['admin', 'manager']);
+  if (!user) return;
   try {
-    const user = await checkAuth(['admin', 'manager']);
-    if (!user) return;
     if (user.role === 'manager') {
       document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
     }
-    document.getElementById('navUser').textContent = user.full_name || user.username;
     warehouses = await gasCall('getWarehouses') || [];
     populateWarehouseSelect();
     loadUsers();
     loadAlertConfig();
-  } catch (e) { location.href = 'login.html'; }
+  } catch (e) {
+    console.error('Admin init error:', e);
+    showToast('Failed to load: ' + e.message, 'danger');
+  }
 }
 
 /* ── Tabs ── */

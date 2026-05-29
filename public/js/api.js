@@ -41,11 +41,23 @@ function clearAuth() {
 }
 
 async function checkAuth(allowedRoles) {
-  const user = getUser();
+  const user  = getUser();
   const token = localStorage.getItem('fda_token');
-  if (!user || !token) { location.href = 'login.html'; return null; }
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    location.href = 'index.html';
+  if (!user || !token) {
+    location.href = 'login.html';
+    return null;
+  }
+  if (allowedRoles && allowedRoles.length && !allowedRoles.includes(user.role)) {
+    // Show clear error instead of silent redirect
+    document.body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif">
+        <div style="text-align:center">
+          <div style="font-size:3rem">🔒</div>
+          <h4>Access Denied</h4>
+          <p class="text-muted">Your role (<strong>${user.role}</strong>) cannot access this page.</p>
+          <a href="index.html" class="btn btn-primary">Go to Dashboard</a>
+        </div>
+      </div>`;
     return null;
   }
   return user;

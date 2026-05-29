@@ -256,24 +256,36 @@ async function flushSaves() {
   const ids = Object.keys(pendingSaves);
   if (!ids.length) return;
   pendingSaves = {};
-  await Promise.all(ids.map(id => {
-    const st = statusMap[id] || {};
-    return gasCall('saveCompliance', {
-      warehouse_id: warehouseId, item_id: id,
-      compliance_date: currentDate, status: st.status || 'pending',
-      checked_by: pharmacistName, notes: st.notes || null
-    });
-  }));
-  document.getElementById('lastSavedLabel').textContent =
-    'Saved at ' + new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  try {
+    await Promise.all(ids.map(id => {
+      const st = statusMap[id] || {};
+      return gasCall('saveCompliance', {
+        warehouse_id: warehouseId, item_id: id,
+        compliance_date: currentDate, status: st.status || 'pending',
+        checked_by: pharmacistName, notes: st.notes || null
+      });
+    }));
+    document.getElementById('lastSavedLabel').textContent =
+      'Auto-saved ' + new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch (e) {
+    showToast('Auto-save failed: ' + e.message, 'danger');
+  }
 }
 
 async function saveAll() {
   const name = document.getElementById('pharmacistName').value.trim();
   if (!name) { showToast('Please enter your name before saving', 'danger'); document.getElementById('pharmacistName').focus(); return; }
-  allItems.forEach(i => { pendingSaves[i.item_id] = true; });
-  await flushSaves();
-  showToast('All changes saved ✓', 'success');
+  const btn = document.getElementById('saveAllBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving…'; }
+  try {
+    allItems.forEach(i => { pendingSaves[i.item_id] = true; });
+    await flushSaves();
+    showToast('All changes saved ✓', 'success');
+  } catch (e) {
+    showToast('Save failed: ' + e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk me-2"></i>Save All'; }
+  }
 }
 
 /* ── File upload: convert to base64 then send via gasCall ── */

@@ -8,21 +8,34 @@ async function init() {
   const user = await checkAuth();
   if (!user) return;
 
-  // Pharmacist with warehouse → go straight to checklist
+  // Pharmacist → go straight to their checklist
   if (user.role === 'pharmacist' && user.warehouse_id) {
     location.href = `checklist.html?id=${user.warehouse_id}`;
     return;
   }
 
-  document.getElementById('navUser').textContent = user.full_name || user.username;
+  // Set username in navbar
+  const navEl = document.getElementById('navUsername');
+  if (navEl) navEl.textContent = user.full_name || user.username;
 
+  // Show review + admin buttons for admin/manager
   if (['admin', 'manager'].includes(user.role)) {
-    document.getElementById('reviewBadgeWrap').classList.remove('d-none');
-    document.getElementById('adminLink').classList.remove('d-none');
+    document.getElementById('reviewBtn')?.classList.remove('d-none');
+    document.getElementById('adminBtn')?.classList.remove('d-none');
     loadReviewCount();
   }
 
+  // Wire up filter tab clicks
+  document.querySelectorAll('#filterTabs .nav-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#filterTabs .nav-link').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadDashboard();
+    });
+  });
+
   document.getElementById('datePicker').value = currentDate;
+  updateDateDisplay();
   await loadDashboard();
   setInterval(loadDashboard, 60000);
 }
@@ -32,62 +45,69 @@ async function loadReviewCount() {
     const data = await gasCall('reviewCount');
     if (data && data.count > 0) {
       const badge = document.getElementById('reviewBadge');
-      badge.textContent = data.count;
-      badge.classList.remove('d-none');
+      if (badge) { badge.textContent = data.count; badge.classList.remove('d-none'); }
     }
   } catch (e) {}
 }
 
 async function loadDashboard() {
   try {
-    document.getElementById('loadingSpinner')?.classList.remove('d-none');
+    const grid = document.getElementById('warehouseGrid');
+    if (grid) grid.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x d-block mb-3"></i>Loading…</div>';
+
     const data = await gasCall('getDashboard', { date: currentDate });
     if (!data) return;
-    renderSummary(data.warehouses);
-    renderGrid(data.warehouses);
+
+    renderSummary(data.warehouses || []);
+    renderGrid(data.warehouses || []);
     renderActivity(data.activity || []);
     updateDateDisplay();
   } catch (e) {
-    document.getElementById('whGrid').innerHTML =
-      `<div class="col-12"><div class="alert alert-danger">Failed to load: ${e.message}</div></div>`;
-  } finally {
-    document.getElementById('loadingSpinner')?.classList.add('d-none');
+    const grid = document.getElementById('warehouseGrid');
+    if (grid) grid.innerHTML = `<div class="col-12"><div class="alert alert-danger">Failed to load: ${e.message}</div></div>`;
   }
 }
 
 function renderSummary(warehouses) {
-  document.getElementById('statTotal').textContent    = warehouses.length;
-  document.getElementById('statComplete').textContent = warehouses.filter(w => w.status === 'complete').length;
-  document.getElementById('statPartial').textContent  = warehouses.filter(w => w.status === 'partial' || w.status === 'has-no').length;
-  document.getElementById('statNotStart').textContent = warehouses.filter(w => w.status === 'notstart').length;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('s-active',    warehouses.length);
+  set('s-complete',  warehouses.filter(w => w.status === 'complete').length);
+  set('s-partial',   warehouses.filter(w => w.status === 'partial' || w.status === 'has-no').length);
+  set('s-notstarted',warehouses.filter(w => w.status === 'notstart').length);
 }
 
 function renderGrid(warehouses) {
-  const activeBtn = document.querySelector('#filterTabs .active');
+  const activeBtn = document.querySelector('#filterTabs .nav-link.active');
   const filter    = activeBtn ? (activeBtn.dataset.filter || 'all') : 'all';
+
   let filtered = warehouses;
   if (filter === 'active') filtered = warehouses.filter(w => w.status !== 'notstart');
-  if (filter === 'issues') filtered = warehouses.filter(w => w.status === 'has-no' || w.status === 'partial');
+  if (filter === 'issue')  filtered = warehouses.filter(w => w.status === 'has-no' || w.status === 'partial');
 
-  const grid = document.getElementById('whGrid');
+  const grid = document.getElementById('warehouseGrid');
+  if (!grid) return;
+
   if (!filtered.length) {
     grid.innerHTML = '<div class="col-12 text-center text-muted py-5">No warehouses match this filter</div>';
     return;
   }
-  const colorMap = { complete: '#16a34a', 'has-no': '#dc2626', partial: '#d97706', notstart: '#94a3b8' };
+
+  const colorMap = { complete:'#16a34a', 'has-no':'#dc2626', partial:'#d97706', notstart:'#94a3b8' };
   const badgeMap = {
     complete: '<span class="badge bg-success">Complete</span>',
     'has-no': '<span class="badge bg-danger">Has Issues</span>',
     partial:  '<span class="badge bg-warning text-dark">Partial</span>',
     notstart: '<span class="badge bg-secondary">Not Started</span>'
   };
+
   grid.innerHTML = filtered.map(wh => {
     const total = wh.total || 13;
     const pct   = total ? Math.round(wh.filled / total * 100) : 0;
     const color = colorMap[wh.status] || '#94a3b8';
     return `
     <div class="col-sm-6 col-lg-4 col-xl-3">
-      <div class="card border-0 shadow-sm h-100" style="cursor:pointer;border-top:4px solid ${color}!important"
+      <div class="card border-0 shadow-sm h-100"
+           style="cursor:pointer;border-top:4px solid ${color}!important"
            onclick="location.href='checklist.html?id=${wh.id}&date=${currentDate}'">
         <div class="card-body p-3">
           <div class="d-flex justify-content-between align-items-start mb-2">
@@ -101,14 +121,14 @@ function renderGrid(warehouses) {
             <span>${wh.filled} / ${total} items</span><span>${pct}%</span>
           </div>
           <div class="progress rounded-pill mb-2" style="height:6px">
-            <div class="progress-bar bg-success" style="width:${Math.round(wh.yes_count/total*100)}%"></div>
-            <div class="progress-bar bg-danger"  style="width:${Math.round(wh.no_count/total*100)}%"></div>
-            <div class="progress-bar bg-secondary" style="width:${Math.round(wh.na_count/total*100)}%"></div>
+            <div class="progress-bar bg-success" style="width:${Math.round((wh.yes_count||0)/total*100)}%"></div>
+            <div class="progress-bar bg-danger"  style="width:${Math.round((wh.no_count||0)/total*100)}%"></div>
+            <div class="progress-bar bg-secondary" style="width:${Math.round((wh.na_count||0)/total*100)}%"></div>
           </div>
           <div class="d-flex gap-3 small">
-            <span class="text-success">✓ ${wh.yes_count} Yes</span>
-            <span class="text-danger">✗ ${wh.no_count} No</span>
-            <span class="text-muted">— ${wh.na_count} N/A</span>
+            <span class="text-success">✓ ${wh.yes_count||0} Yes</span>
+            <span class="text-danger">✗ ${wh.no_count||0} No</span>
+            <span class="text-muted">— ${wh.na_count||0} N/A</span>
           </div>
         </div>
       </div>
@@ -120,25 +140,26 @@ function renderActivity(logs) {
   const tbody = document.getElementById('activityBody');
   if (!tbody) return;
   if (!logs.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No activity today</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No activity today</td></tr>';
     return;
   }
   tbody.innerHTML = logs.map(l => `
     <tr>
-      <td class="small text-muted">${fmtTime(l.created_at)}</td>
       <td class="small">${l.warehouse_name || ''}</td>
       <td class="small text-truncate" style="max-width:180px">${l.item_title || ''}</td>
+      <td class="small">${l.compliance_date || ''}</td>
       <td><span class="badge bg-${l.new_status==='yes'?'success':l.new_status==='no'?'danger':'secondary'}">${(l.new_status||'').toUpperCase()}</span></td>
       <td class="small text-muted">${l.changed_by || ''}</td>
+      <td class="small text-muted">${fmtTime(l.created_at)}</td>
     </tr>`).join('');
 }
 
 function updateDateDisplay() {
   const d = new Date(currentDate + 'T00:00:00');
-  const el = document.getElementById('dateDisplay');
+  const el = document.getElementById('dateLabel');
   if (el) el.textContent = d.toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-  const btnNext  = document.getElementById('btnDateNext');
-  const btnToday = document.getElementById('btnDateToday');
+  const btnNext  = document.getElementById('btnNext');
+  const btnToday = document.getElementById('btnToday');
   if (btnNext)  btnNext.disabled  = currentDate >= todayIST();
   if (btnToday) btnToday.disabled = currentDate === todayIST();
 }
@@ -161,17 +182,11 @@ function goToday() {
   loadDashboard();
 }
 
-function onDatePick(val) {
-  if (val > todayIST()) return;
+// called from datePicker onchange="setDate(this.value)"
+function setDate(val) {
+  if (!val || val > todayIST()) return;
   currentDate = val;
   loadDashboard();
-}
-
-function setFilter(el, filter) {
-  document.querySelectorAll('#filterTabs .btn').forEach(b => { b.classList.remove('active'); delete b.dataset.filter; });
-  el.classList.add('active');
-  el.dataset.filter = filter;
-  renderGrid(window._lastWarehouses || []);
 }
 
 function fmtTime(s) {

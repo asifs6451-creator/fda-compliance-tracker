@@ -1,18 +1,26 @@
 let warehouses = [];
 
 async function init() {
+  console.log('[admin] init() started');
+  console.log('[admin] localStorage token:', localStorage.getItem('fda_token') ? 'present' : 'MISSING');
+  console.log('[admin] localStorage user:', localStorage.getItem('fda_user'));
+
   const user = await checkAuth(['admin', 'manager']);
-  if (!user) return;
+  console.log('[admin] checkAuth returned:', user);
+  if (!user) { console.warn('[admin] checkAuth returned null — stopping'); return; }
+
   try {
     if (user.role === 'manager') {
       document.querySelectorAll('[data-admin-only]').forEach(el => el.remove());
     }
+    console.log('[admin] calling getWarehouses…');
     warehouses = await gasCall('getWarehouses') || [];
+    console.log('[admin] warehouses loaded:', warehouses.length);
     populateWarehouseSelect();
     loadUsers();
     loadAlertConfig();
   } catch (e) {
-    console.error('Admin init error:', e);
+    console.error('[admin] init error:', e);
     showToast('Failed to load: ' + e.message, 'danger');
   }
 }

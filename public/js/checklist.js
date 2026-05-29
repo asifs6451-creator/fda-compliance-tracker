@@ -247,7 +247,10 @@ function updateProgress() {
 function scheduleSave(itemId) {
   pendingSaves[itemId] = true;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushSaves, 1000);
+  saveTimer = setTimeout(async () => {
+    try { await flushSaves(); }
+    catch (e) { showToast('Auto-save failed: ' + e.message, 'danger'); }
+  }, 1000);
 }
 
 async function flushSaves() {
@@ -256,20 +259,17 @@ async function flushSaves() {
   const ids = Object.keys(pendingSaves);
   if (!ids.length) return;
   pendingSaves = {};
-  try {
-    await Promise.all(ids.map(id => {
-      const st = statusMap[id] || {};
-      return gasCall('saveCompliance', {
-        warehouse_id: warehouseId, item_id: id,
-        compliance_date: currentDate, status: st.status || 'pending',
-        checked_by: pharmacistName, notes: st.notes || null
-      });
-    }));
-    document.getElementById('lastSavedLabel').textContent =
-      'Auto-saved ' + new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  } catch (e) {
-    showToast('Auto-save failed: ' + e.message, 'danger');
-  }
+  // Throws on error — callers are responsible for catching
+  await Promise.all(ids.map(id => {
+    const st = statusMap[id] || {};
+    return gasCall('saveCompliance', {
+      warehouse_id: warehouseId, item_id: id,
+      compliance_date: currentDate, status: st.status || 'pending',
+      checked_by: pharmacistName, notes: st.notes || null
+    });
+  }));
+  document.getElementById('lastSavedLabel').textContent =
+    'Auto-saved ' + new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 
 async function saveAll() {
@@ -283,6 +283,8 @@ async function saveAll() {
     showToast('All changes saved ✓', 'success');
   } catch (e) {
     showToast('Save failed: ' + e.message, 'danger');
+    // Restore pending saves so user can retry
+    allItems.forEach(i => { pendingSaves[i.item_id] = true; });
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-floppy-disk me-2"></i>Save All'; }
   }

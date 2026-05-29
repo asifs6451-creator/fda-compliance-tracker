@@ -92,43 +92,44 @@ function renderGrid(warehouses) {
     return;
   }
 
-  const colorMap = { complete:'#16a34a', 'has-no':'#dc2626', partial:'#d97706', notstart:'#94a3b8' };
   const badgeMap = {
-    complete: '<span class="badge bg-success">Complete</span>',
-    'has-no': '<span class="badge bg-danger">Has Issues</span>',
-    partial:  '<span class="badge bg-warning text-dark">Partial</span>',
-    notstart: '<span class="badge bg-secondary">Not Started</span>'
+    complete: '<span class="badge bg-success">✅ Complete</span>',
+    'has-no': '<span class="badge bg-danger">❌ Has Issues</span>',
+    partial:  '<span class="badge bg-warning text-dark">⚠️ Partial</span>',
+    notstart: '<span class="badge bg-secondary">— Not Started</span>'
   };
 
   grid.innerHTML = filtered.map(wh => {
-    const total = wh.total || 13;
-    const pct   = total ? Math.round(wh.filled / total * 100) : 0;
-    const color = colorMap[wh.status] || '#94a3b8';
+    const total   = wh.total || 13;
+    const pct     = total ? Math.round(wh.filled / total * 100) : 0;
+    const status  = wh.status || 'notstart';
     return `
     <div class="col-sm-6 col-lg-4 col-xl-3">
-      <div class="card border-0 shadow-sm h-100"
-           style="cursor:pointer;border-top:4px solid ${color}!important"
+      <div class="card wh-card ${status} h-100"
+           style="cursor:pointer"
            onclick="location.href='checklist.html?id=${wh.id}&date=${currentDate}'">
         <div class="card-body p-3">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
-              <div class="fw-semibold">${wh.name}</div>
-              <div class="text-muted small">${wh.location_code}</div>
+              <div class="fw-bold" style="font-size:.95rem">${wh.name}</div>
+              <div class="text-muted small">${wh.location_code} &nbsp;·&nbsp; ${wh.pharmacist_count} pharmacist${wh.pharmacist_count>1?'s':''}</div>
             </div>
-            ${badgeMap[wh.status] || ''}
+            ${badgeMap[status] || ''}
           </div>
           <div class="d-flex justify-content-between small text-muted mb-1">
-            <span>${wh.filled} / ${total} items</span><span>${pct}%</span>
+            <span>${wh.filled} / ${total} items filled</span>
+            <span class="fw-bold wh-pct ${status}">${pct}%</span>
           </div>
-          <div class="progress rounded-pill mb-2" style="height:6px">
+          <div class="progress rounded-pill mb-2" style="height:7px">
             <div class="progress-bar bg-success" style="width:${Math.round((wh.yes_count||0)/total*100)}%"></div>
             <div class="progress-bar bg-danger"  style="width:${Math.round((wh.no_count||0)/total*100)}%"></div>
-            <div class="progress-bar bg-secondary" style="width:${Math.round((wh.na_count||0)/total*100)}%"></div>
+            <div class="progress-bar bg-info"    style="width:${Math.round((wh.na_count||0)/total*100)}%"></div>
           </div>
-          <div class="d-flex gap-3 small">
-            <span class="text-success">✓ ${wh.yes_count||0} Yes</span>
-            <span class="text-danger">✗ ${wh.no_count||0} No</span>
-            <span class="text-muted">— ${wh.na_count||0} N/A</span>
+          <div class="d-flex gap-2">
+            <span class="mini-pill mp-yes">✓ ${wh.yes_count||0}</span>
+            <span class="mini-pill mp-no">✗ ${wh.no_count||0}</span>
+            <span class="mini-pill mp-na">— ${wh.na_count||0}</span>
+            ${wh.filled > 0 ? `<span class="mini-pill mp-pd ms-auto">${total - wh.filled} left</span>` : ''}
           </div>
         </div>
       </div>

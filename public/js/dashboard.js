@@ -101,8 +101,10 @@ function renderGrid(warehouses) {
 
   grid.innerHTML = filtered.map(wh => {
     const total   = wh.total || 13;
-    const pct     = total ? Math.round(wh.filled / total * 100) : 0;
+    const filled  = Math.min(wh.filled, total);
+    const pct     = total ? Math.min(100, Math.round(filled / total * 100)) : 0;
     const status  = wh.status || 'notstart';
+    const left    = Math.max(0, total - filled);
     return `
     <div class="col-sm-6 col-lg-4 col-xl-3">
       <div class="card wh-card ${status} h-100"
@@ -117,19 +119,19 @@ function renderGrid(warehouses) {
             ${badgeMap[status] || ''}
           </div>
           <div class="d-flex justify-content-between small text-muted mb-1">
-            <span>${wh.filled} / ${total} items filled</span>
+            <span>${filled} / ${total} items filled</span>
             <span class="fw-bold wh-pct ${status}">${pct}%</span>
           </div>
           <div class="progress rounded-pill mb-2" style="height:7px">
-            <div class="progress-bar bg-success" style="width:${Math.round((wh.yes_count||0)/total*100)}%"></div>
-            <div class="progress-bar bg-danger"  style="width:${Math.round((wh.no_count||0)/total*100)}%"></div>
-            <div class="progress-bar bg-info"    style="width:${Math.round((wh.na_count||0)/total*100)}%"></div>
+            <div class="progress-bar bg-success" style="width:${Math.min(100, Math.round((wh.yes_count||0)/total*100))}%"></div>
+            <div class="progress-bar bg-danger"  style="width:${Math.min(100, Math.round((wh.no_count||0)/total*100))}%"></div>
+            <div class="progress-bar bg-info"    style="width:${Math.min(100, Math.round((wh.na_count||0)/total*100))}%"></div>
           </div>
           <div class="d-flex gap-2">
             <span class="mini-pill mp-yes">✓ ${wh.yes_count||0}</span>
             <span class="mini-pill mp-no">✗ ${wh.no_count||0}</span>
             <span class="mini-pill mp-na">— ${wh.na_count||0}</span>
-            ${wh.filled > 0 ? `<span class="mini-pill mp-pd ms-auto">${total - wh.filled} left</span>` : ''}
+            ${filled > 0 && left > 0 ? `<span class="mini-pill mp-pd ms-auto">${left} left</span>` : ''}
           </div>
         </div>
       </div>
